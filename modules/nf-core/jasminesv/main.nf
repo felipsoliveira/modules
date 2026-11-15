@@ -38,6 +38,10 @@ process JASMINESV {
     def chr_norm_argument = chr_norm ? "chr_norm_file=${chr_norm}" : ""
 
     def first_vcf = vcfs[0].name.replaceAll(".gz\$", "")
+    // Jasmine names the sample columns <input index>_<sample> when it outputs genotypes
+    def chrom_line = args.contains("--output_genotypes")
+        ? "awk -v OFS='\\t' -v idx=0 '/^#CHROM/ { if (!line) { line = \$1; for (i = 2; i <= 9; i++) line = line OFS \$i } for (i = 10; i <= NF; i++) line = line OFS idx \"_\" \$i; idx++ } END { print line }' \$(cat vcfs.txt) >> ${prefix}.vcf"
+        : "grep \"^#CHROM\" ${first_vcf} >> ${prefix}.vcf"
     def unzip_inputs = vcfs.collect { vcf -> vcf.name.endsWith(".vcf.gz") ? "    bgzip -d --threads ${task.cpus} ${args4} ${vcf}" : "" }.join("\n")
 
     vcfs.each { vcf ->
@@ -66,7 +70,9 @@ process JASMINESV {
         bgzip --threads ${task.cpus} ${args3} ${prefix}.vcf
     else
         echo "The file is empty, using the header of the first VCF as output file"
-        cat ${first_vcf} | grep "#" | bgzip --threads ${task.cpus} ${args3} > ${prefix}.vcf.gz
+        grep "^##" ${first_vcf} > ${prefix}.vcf
+        ${chrom_line}
+        bgzip --threads ${task.cpus} ${args3} ${prefix}.vcf
     fi
     """
 

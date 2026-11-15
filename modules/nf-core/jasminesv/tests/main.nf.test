@@ -338,4 +338,34 @@ nextflow_process {
 
     }
 
+    test("homo_sapiens - [vcf, vcf2, vcf3] without records, [], [], [], [], [], [] - output_genotypes") {
+
+        when {
+            params {
+                args = "--output_genotypes"
+            }
+            process {
+                """
+                input[0] = channel.of('sample1', 'sample2', 'sample3')
+                    .collectFile { name ->
+                        [ name + '.vcf', '##fileformat=VCFv4.2\\n##contig=<ID=chr1,length=10000>\\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\\n#CHROM\\tPOS\\tID\\tREF\\tALT\\tQUAL\\tFILTER\\tINFO\\tFORMAT\\t' + name + '\\n' ]
+                    }
+                    .toSortedList { a, b -> a.name <=> b.name }
+                    .map { vcfs -> [ [ id:"test" ], vcfs, [], [], [] ] }
+                input[1] = [[],[]]
+                input[2] = [[],[]]
+                input[3] = []
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert path(process.out.vcf.get(0).get(1)).vcf.header.getGenotypeSamples() == [ "0_sample1", "1_sample2", "2_sample3" ] }
+            )
+        }
+
+    }
+
 }
